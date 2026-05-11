@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Suivi interventions</title>
+  <style>
+    :root{--blue:#0f67ff;--bg:#f3f7fb;--card:#fff;--txt:#102033;--muted:#5d7189;--red:#ffdde0;--green:#d9f7df;--orange:#fff0c2}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);font-family:Arial,Helvetica,sans-serif;color:var(--txt)}
+    header{background:#fff;padding:22px 28px;box-shadow:0 3px 18px rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+    h1{margin:0;font-size:34px}.links a{display:inline-block;margin-left:8px;text-decoration:none;background:#e8f0ff;color:#0f45a5;padding:11px 16px;border-radius:12px;font-weight:700}
+    main{padding:24px;max-width:1500px;margin:auto}.panel{background:var(--card);border-radius:22px;box-shadow:0 8px 25px rgba(0,0,0,.08);padding:22px;margin-bottom:24px}
+    h2{margin:0 0 16px;font-size:24px}.grid{display:grid;grid-template-columns:1fr 1fr 1.6fr .6fr .6fr .6fr;gap:12px;align-items:end}
+    label{font-weight:700;color:#33475f;font-size:14px} input,select,textarea{width:100%;padding:13px;border:1px solid #d6e0ea;border-radius:13px;font-size:16px;background:#fff;font-family:Arial,Helvetica,sans-serif}
+    textarea{min-height:95px;resize:vertical;line-height:1.35}.btn{border:0;background:var(--blue);color:#fff;border-radius:13px;padding:14px 18px;font-weight:800;font-size:16px;cursor:pointer;width:100%}
+    table{width:100%;border-collapse:separate;border-spacing:0 10px} th{text-align:left;color:#5d7189;font-size:14px;padding:0 12px} td{background:#fff;padding:14px 12px;vertical-align:top;border-top:1px solid #edf2f7;border-bottom:1px solid #edf2f7;font-size:16px}
+    td:first-child{border-left:1px solid #edf2f7;border-radius:15px 0 0 15px} td:last-child{border-right:1px solid #edf2f7;border-radius:0 15px 15px 0}.nature{max-width:520px;white-space:pre-wrap;line-height:1.35}.pill{display:inline-block;padding:8px 12px;border-radius:999px;font-weight:900;font-size:13px}.urgent{background:var(--red);color:#9d111d}.normal{background:#eef3f8;color:#40566e}.afaire{background:#eef3f8}.encours{background:var(--orange)}.termine{background:var(--green)}
+    .actions a{text-decoration:none;display:inline-block;margin:3px;padding:8px 10px;border-radius:10px;font-size:13px;font-weight:800}.a1{background:#edf3ff;color:#0f45a5}.a2{background:#fff0c2;color:#7a5200}.a3{background:#d9f7df;color:#126324}.del{background:#ffe6e8;color:#9d111d}
+    @media(max-width:1000px){.grid{grid-template-columns:1fr}.links a{margin:4px 4px 0 0}table,thead,tbody,tr,td,th{display:block}thead{display:none}tr{margin-bottom:14px;background:#fff;border-radius:15px;padding:8px;box-shadow:0 4px 12px rgba(0,0,0,.04)}td{border:0!important;border-radius:0!important}.nature{max-width:none}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Suivi interventions</h1>
+  <div class="links">
+    <a href="/ecran">Écran atelier</a>
+    <a href="/historique?code={{ code }}">Historique</a>
+    <a href="/export/monthly?code={{ code }}">Export mois</a>
+    <a href="/export/all?code={{ code }}">Export complet</a>
+  </div>
+</header>
+<main>
+  <section class="panel">
+    <h2>Ajouter une intervention</h2>
+    <form method="post" action="/?code={{ code }}" class="grid">
+      <div><label>Client</label><input name="client" required></div>
+      <div><label>Adresse</label><input name="adresse" required></div>
+      <div><label>Nature de l'intervention / description panne</label><textarea name="nature" required placeholder="Décris la panne, les infos client, ce qu'il faut prévoir..."></textarea></div>
+      <div><label>Urgence</label><select name="urgence"><option>NORMALE</option><option>URGENT</option></select></div>
+      <div><label>Statut</label><select name="statut"><option>A FAIRE</option><option>EN COURS</option><option>TERMINE</option></select></div>
+      <div><label>Date</label><input name="date_intervention" type="date"></div>
+      <button class="btn" type="submit">Ajouter</button>
+    </form>
+  </section>
+  <section class="panel">
+    <h2>Interventions</h2>
+    <table>
+      <thead><tr><th>Date</th><th>Client</th><th>Adresse</th><th>Nature intervention</th><th>Urgence</th><th>Statut</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for i in interventions %}
+        <tr class="{% if i.statut == 'TERMINE' %}termine{% elif i.urgence == 'URGENT' %}urgent{% elif i.statut == 'EN COURS' %}encours{% else %}afaire{% endif %}">
+          <td>{{ i.date_intervention }}</td><td><b>{{ i.client }}</b></td><td>{{ i.adresse }}</td><td class="nature">{{ i.nature }}</td>
+          <td><span class="pill {{ 'urgent' if i.urgence == 'URGENT' else 'normal' }}">{{ i.urgence }}</span></td><td><b>{{ i.statut }}</b></td>
+          <td class="actions"><a class="a1" href="/statut/{{ i.id }}/A_FAIRE?code={{ code }}">À faire</a><a class="a2" href="/statut/{{ i.id }}/EN_COURS?code={{ code }}">En cours</a><a class="a3" href="/statut/{{ i.id }}/TERMINE?code={{ code }}">Terminé</a><a class="del" href="/delete/{{ i.id }}?code={{ code }}" onclick="return confirm('Supprimer cette intervention ?')">Suppr.</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>
