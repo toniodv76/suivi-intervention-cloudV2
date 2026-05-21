@@ -5,99 +5,132 @@
   <title>Écran interventions</title>
   <style>
     :root{
-      --bg:#07111f;--card:#fff;--red:#ff3347;--green:#25d366;
-      --orange:#ffb020;--blue:#4da3ff;--muted:#b9c7d6;
-      --client:36px;--adresse:24px;--nature:27px;--badge:21px;
+      --bg:#07111f;--red:#ff3347;--green:#25d366;
+      --orange:#ffb020;--muted:#b9c7d6;
     }
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);font-family:Arial,Helvetica,sans-serif;color:#fff;overflow:hidden}
     header{height:104px;padding:26px 34px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.12)}
     h1{font-size:46px;margin:0}.clock{font-size:28px;color:var(--muted);font-weight:700}
-    #wrap{padding:20px;display:grid;gap:18px;height:calc(100vh - 104px);overflow:hidden}
-    .card{background:#fff;color:#102033;border-radius:24px;padding:20px;box-shadow:0 10px 32px rgba(0,0,0,.25);border-left:14px solid #d9e3ef;overflow:hidden}
+    #wrap{padding:22px;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);gap:22px;height:calc(100vh - 104px);overflow:hidden}
+    .card{background:#fff;color:#102033;border-radius:26px;padding:24px;box-shadow:0 10px 32px rgba(0,0,0,.25);border-left:16px solid #d9e3ef;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between}
     .card.urgent{border-left-color:var(--red)}.card.encours{border-left-color:var(--orange)}.card.termine{border-left-color:var(--green)}
     .top{display:flex;justify-content:space-between;gap:15px;align-items:flex-start}
-    .client{font-size:var(--client);font-weight:900;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .date{font-size:calc(var(--adresse) * .9);font-weight:900;color:#395064;white-space:nowrap}
-    .adresse{font-size:var(--adresse);color:#32475c;margin-top:8px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .nature{font-size:var(--nature);line-height:1.18;margin-top:14px;white-space:pre-wrap;overflow:hidden}
+    .client{font-size:34px;font-weight:900;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .date{font-size:22px;font-weight:900;color:#395064;white-space:nowrap}
+    .adresse{font-size:23px;color:#32475c;margin-top:8px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .nature{font-size:25px;line-height:1.18;margin-top:14px;white-space:pre-wrap;overflow:hidden;max-height:140px}
     .badges{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
-    .badge{font-size:var(--badge);font-weight:900;border-radius:999px;padding:8px 14px}
+    .badge{font-size:19px;font-weight:900;border-radius:999px;padding:8px 14px}
     .b-urgent{background:#ffdde0;color:#9d111d}.b-normal{background:#edf3f8;color:#40566e}.b-afaire{background:#edf3f8;color:#40566e}.b-encours{background:#fff0c2;color:#7a5200}.b-termine{background:#d9f7df;color:#126324}
     .empty{grid-column:1/-1;text-align:center;color:#b9c7d6;font-size:42px;margin-top:15vh}
+    .pageinfo{font-size:22px;color:#b9c7d6;font-weight:700}
   </style>
 </head>
 <body>
-<header><h1>Interventions</h1><div class="clock" id="clock"></div></header>
+
+<header>
+  <h1>Interventions</h1>
+  <div>
+    <div class="clock" id="clock"></div>
+    <div class="pageinfo" id="pageinfo"></div>
+  </div>
+</header>
+
 <div id="wrap"></div>
 
 <script>
-function esc(s){return (s ?? '').toString().replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
-function cls(i){if(i.statut==='TERMINE')return'termine';if(i.urgence==='URGENT')return'urgent';if(i.statut==='EN COURS')return'encours';return''}
-function badgeStatut(s){if(s==='TERMINE')return'b-termine';if(s==='EN COURS')return'b-encours';return'b-afaire'}
+let allData = [];
+let page = 0;
+const perPage = 4;
 
-function adapt(count){
-  const wrap=document.getElementById('wrap');
-  let cols=2, rows=2;
-
-  if(count<=1){cols=1;rows=1}
-  else if(count<=2){cols=2;rows=1}
-  else if(count<=4){cols=2;rows=2}
-  else if(count<=6){cols=2;rows=3}
-  else if(count<=9){cols=3;rows=3}
-  else {cols=3;rows=4}
-
-  wrap.style.gridTemplateColumns=`repeat(${cols},1fr)`;
-  wrap.style.gridTemplateRows=`repeat(${rows},1fr)`;
-
-  const k=Math.max(.62, Math.min(1.35, 5 / Math.max(count,3)));
-  document.documentElement.style.setProperty('--client', `${36*k}px`);
-  document.documentElement.style.setProperty('--adresse', `${24*k}px`);
-  document.documentElement.style.setProperty('--nature', `${27*k}px`);
-  document.documentElement.style.setProperty('--badge', `${21*k}px`);
+function esc(s){
+  return (s ?? '').toString().replace(/[&<>'"]/g,c=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'
+  }[c]));
 }
 
-async function load(){
- const r=await fetch('/api/interventions',{cache:'no-store'});
- const data=await r.json();
- const visibles=data.filter(i=>i.statut!=='TERMINE');
- const wrap=document.getElementById('wrap');
+function cls(i){
+  if(i.statut==='TERMINE')return'termine';
+  if(i.urgence==='URGENT')return'urgent';
+  if(i.statut==='EN COURS')return'encours';
+  return '';
+}
 
- adapt(visibles.length);
+function badgeStatut(s){
+  if(s==='TERMINE')return'b-termine';
+  if(s==='EN COURS')return'b-encours';
+  return'b-afaire';
+}
 
- if(!visibles.length){
-   wrap.innerHTML='<div class="empty">Aucune intervention</div>';
-   return;
- }
+async function fetchData(){
+  const r = await fetch('/api/interventions',{cache:'no-store'});
+  const data = await r.json();
 
- wrap.innerHTML=visibles.map(i=>`
-  <div class="card ${cls(i)}">
-    <div>
-      <div class="top">
-        <div style="min-width:0">
-          <div class="client">${esc(i.client)}</div>
-          <div class="adresse">${esc(i.adresse)}</div>
+  allData = data.filter(i => i.statut !== 'TERMINE');
+
+  if(page >= Math.ceil(allData.length / perPage)){
+    page = 0;
+  }
+
+  renderPage();
+}
+
+function renderPage(){
+  const wrap = document.getElementById('wrap');
+  const totalPages = Math.max(1, Math.ceil(allData.length / perPage));
+  const start = page * perPage;
+  const visibles = allData.slice(start, start + perPage);
+
+  document.getElementById('pageinfo').textContent =
+    allData.length > perPage ? `Page ${page + 1}/${totalPages}` : '';
+
+  if(!visibles.length){
+    wrap.innerHTML='<div class="empty">Aucune intervention</div>';
+    return;
+  }
+
+  wrap.innerHTML = visibles.map(i=>`
+    <div class="card ${cls(i)}">
+      <div>
+        <div class="top">
+          <div style="min-width:0">
+            <div class="client">${esc(i.client)}</div>
+            <div class="adresse">${esc(i.adresse)}</div>
+          </div>
+          <div class="date">${esc(i.date_intervention)}</div>
         </div>
-        <div class="date">${esc(i.date_intervention)}</div>
+        <div class="nature">${esc(i.nature)}</div>
       </div>
-      <div class="nature">${esc(i.nature)}</div>
+
+      <div class="badges">
+        <span class="badge ${i.urgence==='URGENT'?'b-urgent':'b-normal'}">${esc(i.urgence)}</span>
+        <span class="badge ${badgeStatut(i.statut)}">${esc(i.statut)}</span>
+      </div>
     </div>
-    <div class="badges">
-      <span class="badge ${i.urgence==='URGENT'?'b-urgent':'b-normal'}">${esc(i.urgence)}</span>
-      <span class="badge ${badgeStatut(i.statut)}">${esc(i.statut)}</span>
-    </div>
-  </div>
- `).join('');
+  `).join('');
+}
+
+function nextPage(){
+  const totalPages = Math.max(1, Math.ceil(allData.length / perPage));
+  if(totalPages > 1){
+    page = (page + 1) % totalPages;
+    renderPage();
+  }
 }
 
 function tick(){
- document.getElementById('clock').textContent=
- new Date().toLocaleString('fr-FR',{weekday:'long',hour:'2-digit',minute:'2-digit'});
+  document.getElementById('clock').textContent =
+    new Date().toLocaleString('fr-FR',{weekday:'long',hour:'2-digit',minute:'2-digit'});
 }
 
-setInterval(load,2000);
-setInterval(tick,1000);
-load();tick();
+setInterval(fetchData, 5000);
+setInterval(nextPage, 8000);
+setInterval(tick, 1000);
+
+fetchData();
+tick();
 </script>
+
 </body>
 </html>
